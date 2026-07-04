@@ -1,0 +1,15 @@
+.git
+.gitignore
+.claude
+.venv
+__pycache__/
+*.py[oc]
+
+# Data / analysis — not needed at runtime
+*.zip
+*.csv
+*.ipynb
+churn_da_ds.html
+
+# Docs
+README.md
