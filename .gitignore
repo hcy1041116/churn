@@ -18,3 +18,6 @@ train.csv
 test.csv
 sample_submission.csv
 playground-series-s6e3.zip
+
+# Derived BI export (large, regenerate with export_churn_bi.py)
+churn_bi.csv

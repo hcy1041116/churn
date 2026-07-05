@@ -12,24 +12,20 @@
 
 ```
 ┌─────────────────┐     ┌──────────────────────┐
-│  Streamlit App  │     │   Superset (BI)      │
+│  Streamlit App  │     │   Power BI Web       │
 │  即時流失預測    │     │   流失趨勢 / 客群報表  │
 │  (模型互動 demo) │     │                      │
 └────────┬────────┘     └──────────┬───────────┘
-         │ 載入                     │ 連線查詢
+         │ 載入                     │ 匯入 CSV
          ▼                          ▼
-  model_lgbm.joblib          ┌─────────────┐
-  kmeans.joblib              │  Postgres   │
-  seg_scaler.joblib          │ churn_      │
-                             │ analytics   │
-                             └──────▲──────┘
-                                    │ 寫入
-                          load_to_postgres.py
+  model_lgbm.joblib            churn_bi.csv
+  kmeans.joblib          （由 export_churn_bi.py 產生）
+  seg_scaler.joblib
 ```
 
 兩條線分別對應：
 - **Streamlit** → 把 ML 模型包成可互動產品
-- **Superset + Postgres** → 資料建模 + BI + 自架服務
+- **Power BI** → 匯入乾淨資料集，做流失趨勢與客群報表
 
 ---
 
@@ -40,7 +36,7 @@
 | `churn_da_ds.ipynb` / `.html` | DA + DS 全流程分析筆記：EDA、洩漏檢查、多模型比較、分群演算法比較（模型選型過程紀錄）。 |
 | `train_and_save.py` | 訓練 LightGBM + KMeans，輸出模型／scaler／中繼資料 |
 | `app.py` | Streamlit 即時預測介面 |
-| `load_to_postgres.py` | 資料 + 預測 + 客群標籤寫入 Postgres，供 Superset 讀取 |
+| `export_churn_bi.py` | 產出 Power BI 用的乾淨分析資料集 `churn_bi.csv`（含 churn_prob、segment_label） |
 | `model_lgbm.joblib` | 訓練好的 LightGBM 模型 |
 | `kmeans.joblib` / `seg_scaler.joblib` | KMeans 分群器與其標準化器 |
 | `meta.json` | 特徵順序、客群標籤、AUC 等中繼資料 |
@@ -68,50 +64,24 @@ uv run streamlit run app.py
 
 ---
 
-## 部署到 Railway
+## 部署
 
-### A. Streamlit App（單一 service）
+### A. Streamlit App（Railway）
 
 1. 把本資料夾推上 GitHub。
 2. Railway → New Project → Deploy from GitHub repo，選此 repo。
 3. Railway 會自動讀 `Dockerfile` 建置。`$PORT` 已在 Dockerfile 處理，無需額外設定。
 4. 部署完成後在 Settings → Networking 產生公開網址。
 
-### B. Postgres + 資料載入
+### B. Power BI（BI 儀表板，與 Railway 無關）
 
-1. Railway 專案內 → New → Database → **PostgreSQL**。
-2. 複製 Postgres 的 `DATABASE_URL`（連線字串）。
-3. 本機或 Railway job 執行載入（需 `train.csv`）：
-   ```bash
-   export DATABASE_URL="postgresql://...(從 Railway 複製)"
-   python load_to_postgres.py
-   ```
-   完成後 Postgres 會有一張 `churn_analytics` 表。
-
-### C. Superset（BI）
-
-> ⚠️ Superset 較吃資源（建議連 Postgres 存 metadata；記憶體需求高於 Streamlit）。
-> Railway 免費額度同時跑 Streamlit + Postgres + Superset 可能不足，必要時分批啟用或升級方案。
-
-建議用官方 Docker 映像部署：
-
-1. Railway → New → Empty Service，來源設為 Superset 官方映像 `apache/superset`。
-2. 設定環境變數：
-   - `SUPERSET_SECRET_KEY`：自訂一組隨機長字串。
-   - `SQLALCHEMY_DATABASE_URI`：指向上面 Postgres（Superset 自身 metadata，可用同一個 Postgres 另建 db 或共用）。
-3. 首次啟動需初始化（在 service shell 執行）：
-   ```bash
-   superset db upgrade
-   superset fab create-admin        # 建管理員帳號
-   superset init
-   ```
-4. 登入 Superset → Settings → Database Connections → 新增，連到步驟 B 的 Postgres。
-5. Datasets → 加入 `churn_analytics` 表。
-6. Charts 建以下圖表，組成 Dashboard：
+1. 本機執行 `uv run export_churn_bi.py`（需要 `train.csv` 在同目錄），產生 `churn_bi.csv`。
+2. 打開 [Power BI Web](https://app.powerbi.com) → 建立新報表 → 取得資料 → 上傳 `churn_bi.csv`。
+3. 建議圖表，組成 Dashboard：
    - **各客群流失率**（Bar：`segment_label` × avg `churn_flag`）
    - **合約類型流失分布**（Bar：`Contract` × avg `churn_flag`）
    - **付款方式流失分布**（Bar：`PaymentMethod` × avg `churn_flag`）
-   - **tenure 分箱留存**（Histogram / Line：`tenure` × churn rate）
+   - **tenure 分箱留存**（Bar：`tenure_group` × churn rate）
    - **預測機率 vs 實際**（Table：`segment_label` × avg `churn_prob` × avg `churn_flag`，展示校準）
 
 ---
