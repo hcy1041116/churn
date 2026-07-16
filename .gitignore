@@ -21,3 +21,8 @@ playground-series-s6e3.zip
 
 # Derived BI export (large, regenerate with export_churn_bi.py)
 churn_bi.csv
+
+# Personal learning notes (local only, not for public repo)
+learning_notes.md
+interview_speech.md
+interview_prep.md
