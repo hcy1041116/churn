@@ -1,0 +1,6 @@
+expression CsvPath = "C:\Users\CHANGE_ME\churn_mart.csv" meta [IsParameterQuery=true, Type="Text", IsParameterQueryRequired=true]
+	lineageTag: 645b5ee6-3489-4684-810b-ff03e93572a9
+
+	annotation PBI_NavigationStepName = Navigation
+
+	annotation PBI_ResultType = Text

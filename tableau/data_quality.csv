@@ -1,0 +1,26 @@
+﻿欄位名稱,型態,缺值數,缺值比例,相異值個數
+id,整數,0,0.0,594194
+gender,文字,0,0.0,2
+SeniorCitizen,整數,0,0.0,2
+Partner,文字,0,0.0,2
+Dependents,文字,0,0.0,2
+tenure,整數,0,0.0,72
+PhoneService,文字,0,0.0,2
+MultipleLines,文字,0,0.0,3
+InternetService,文字,0,0.0,3
+OnlineSecurity,文字,0,0.0,3
+OnlineBackup,文字,0,0.0,3
+DeviceProtection,文字,0,0.0,3
+TechSupport,文字,0,0.0,3
+StreamingTV,文字,0,0.0,3
+StreamingMovies,文字,0,0.0,3
+Contract,文字,0,0.0,3
+PaperlessBilling,文字,0,0.0,2
+PaymentMethod,文字,0,0.0,4
+MonthlyCharges,小數,0,0.0,1921
+TotalCharges,小數,0,0.0,31910
+是否流失,整數,0,0.0,2
+預測流失機率,小數,0,0.0,291339
+客群,文字,0,0.0,4
+使用月數分組,文字,0,0.0,4
+總筆數,"594,194 筆",,,

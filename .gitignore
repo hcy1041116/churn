@@ -19,5 +19,18 @@ test.csv
 sample_submission.csv
 playground-series-s6e3.zip
 
-# Derived BI export (large, regenerate with export_churn_bi.py)
+# 交叉驗證的 out-of-fold 流失機率（~9 MB，用 train_and_save.py 重新產生）
+oof_predictions.csv
+
+# 舊版 Power BI 匯出（export_churn_bi.py 已移除，Power BI 改讀 tableau/churn_mart.csv）
 churn_bi.csv
+
+# Power BI 用的明細（~100 MB，用 export_for_tableau.py 重新產生）
+tableau/churn_mart.csv
+# Tableau dashboard 用的客戶明細（~100 MB，用 export_for_tableau.py 重新產生）
+tableau/churn_dashboard.csv
+
+# 逐行講解教材（本機用）：產生工具、擷取資料、產生的頁面和製作說明
+docs/walkthrough_tools/
+docs/walkthrough.html
+docs/walkthrough_prompt.md

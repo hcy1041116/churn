@@ -4,11 +4,10 @@ Customer Churn — 即時預測 Streamlit App
 
 本機執行：streamlit run app.py
 """
-import json
-import joblib
-import numpy as np
 import pandas as pd
 import streamlit as st
+
+from churn_features import engineer, load_artifacts, predict_churn, predict_segment
 
 st.set_page_config(page_title="Customer Churn 預測", page_icon="📉", layout="wide")
 
@@ -16,64 +15,23 @@ st.set_page_config(page_title="Customer Churn 預測", page_icon="📉", layout=
 # 載入模型與中繼資料（快取，避免每次互動重載）
 # ---------------------------------------------------------------
 @st.cache_resource
-def load_artifacts():
-    model = joblib.load("model_lgbm.joblib")
-    seg_scaler = joblib.load("seg_scaler.joblib")
-    kmeans = joblib.load("kmeans.joblib")
-    with open("meta.json", encoding="utf-8") as f:
-        meta = json.load(f)
-    with open("feature_choices.json", encoding="utf-8") as f:
-        choices = json.load(f)
-    return model, seg_scaler, kmeans, meta, choices
+def get_artifacts():
+    return load_artifacts()
 
 
-model, seg_scaler, kmeans, meta, CHOICES = load_artifacts()
-FEATURE_ORDER = meta["feature_order"]
-ADDON_COLS = meta["addon_cols"]
-SEG_COLS = meta["seg_cols"]
-SEG_LABEL = {int(k): v for k, v in meta["seg_label"].items()}
+art = get_artifacts()
+meta = art["meta"]
+CHOICES = art["levels"]
 
 
 # ---------------------------------------------------------------
-# 把使用者的原始輸入 → 模型要的特徵向量（與訓練時 one-hot 完全對齊）
+# 一位客戶的原始輸入 → 流失機率與客群（跟訓練、批次評分走同一套處理）
 # ---------------------------------------------------------------
-def build_feature_row(raw: dict) -> pd.DataFrame:
-    # 1) 衍生特徵（與 train_and_save.py 一致）
-    tenure = max(raw["tenure"], 0)
-    total = raw["TotalCharges"]
-    avg_monthly_spend = total / max(tenure, 1)
-    num_addons = sum(1 for c in ADDON_COLS if raw[c] == "Yes")
-
-    # 2) 組一列原始 DataFrame，再用 get_dummies，最後 reindex 對齊訓練欄位
-    row = {
-        "SeniorCitizen": raw["SeniorCitizen"],
-        "tenure": tenure,
-        "MonthlyCharges": raw["MonthlyCharges"],
-        "TotalCharges": total,
-        "avg_monthly_spend": avg_monthly_spend,
-        "num_addons": num_addons,
-    }
-    # 類別欄照原值放入
-    for c in CHOICES:
-        row[c] = raw[c]
-
-    df = pd.DataFrame([row])
-    cat_cols = list(CHOICES.keys())
-    df = pd.get_dummies(df, columns=cat_cols, drop_first=True)
-    # reindex：訓練時有、這裡沒有的欄補 0；多的丟掉；順序對齊
-    df = df.reindex(columns=FEATURE_ORDER, fill_value=0).astype(float)
-    return df, num_addons
-
-
-def predict_segment(raw: dict, num_addons: int) -> str:
-    seg_row = pd.DataFrame([{
-        "tenure": raw["tenure"],
-        "MonthlyCharges": raw["MonthlyCharges"],
-        "TotalCharges": raw["TotalCharges"],
-        "num_addons": num_addons,
-    }])[SEG_COLS]
-    seg = int(kmeans.predict(seg_scaler.transform(seg_row))[0])
-    return SEG_LABEL.get(seg, f"群{seg}")
+def score(raw: dict):
+    data = engineer(pd.DataFrame([raw]))
+    prob = float(predict_churn(data, art)[0])
+    segment = predict_segment(data, art).iloc[0]
+    return prob, segment, int(data["num_addons"].iloc[0])
 
 
 def retention_advice(prob: float, segment: str, raw: dict) -> list:
@@ -101,7 +59,7 @@ def retention_advice(prob: float, segment: str, raw: dict) -> list:
 # ---------------------------------------------------------------
 st.title("📉 電信客戶流失預測")
 st.caption(
-    f"LightGBM｜holdout AUC {meta['holdout_auc']}｜5-fold {meta['cv_auc']} ± {meta['cv_std']}"
+    f"LightGBM｜5 折交叉驗證 AUC {meta['cv_auc']} ± {meta['cv_std']}"
     "　·　資料：Kaggle Playground S6E3（合成資料）"
 )
 
@@ -133,20 +91,18 @@ with left:
         PaperlessBilling = st.selectbox("無紙帳單 PaperlessBilling", CHOICES["PaperlessBilling"])
         PaymentMethod = st.selectbox("付款方式 PaymentMethod", CHOICES["PaymentMethod"])
 
-raw = dict(
-    SeniorCitizen=SeniorCitizen, tenure=tenure, MonthlyCharges=MonthlyCharges,
-    TotalCharges=TotalCharges, gender=gender, Partner=Partner, Dependents=Dependents,
-    PhoneService=PhoneService, MultipleLines=MultipleLines, InternetService=InternetService,
-    OnlineSecurity=OnlineSecurity, OnlineBackup=OnlineBackup, DeviceProtection=DeviceProtection,
-    TechSupport=TechSupport, StreamingTV=StreamingTV, StreamingMovies=StreamingMovies,
-    Contract=Contract, PaperlessBilling=PaperlessBilling, PaymentMethod=PaymentMethod,
-)
+raw = {
+    "SeniorCitizen": SeniorCitizen, "tenure": tenure, "MonthlyCharges": MonthlyCharges,
+    "TotalCharges": TotalCharges, "gender": gender, "Partner": Partner, "Dependents": Dependents,
+    "PhoneService": PhoneService, "MultipleLines": MultipleLines, "InternetService": InternetService,
+    "OnlineSecurity": OnlineSecurity, "OnlineBackup": OnlineBackup, "DeviceProtection": DeviceProtection,
+    "TechSupport": TechSupport, "StreamingTV": StreamingTV, "StreamingMovies": StreamingMovies,
+    "Contract": Contract, "PaperlessBilling": PaperlessBilling, "PaymentMethod": PaymentMethod,
+}
 
 with right:
     st.subheader("預測結果")
-    X_row, num_addons = build_feature_row(raw)
-    prob = float(model.predict_proba(X_row)[0, 1])
-    segment = predict_segment(raw, num_addons)
+    prob, segment, num_addons = score(raw)
 
     st.metric("流失機率", f"{prob:.1%}")
     st.progress(min(prob, 1.0))
@@ -168,5 +124,5 @@ with right:
 st.divider()
 st.caption(
     "說明：本 app 載入預先訓練的 LightGBM 模型做即時推論；分群由 KMeans（標準化後）決定。"
-    "模型選擇 LightGBM 而非 XGBoost，因同等 AUC 下（差距在 CV 標準差內）訓練更快、記憶體更省，適合此資料規模。"
+    "模型選擇：notebook 比較中 GradientBoosting、HistGB、LightGBM 的 AUC 都約 0.916（差距在 CV 標準差內），選 LightGBM 是因為訓練更快、記憶體更省，適合此資料規模。"
 )

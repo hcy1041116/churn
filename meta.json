@@ -1,4 +1,27 @@
 {
+  "input_cols": [
+    "gender",
+    "SeniorCitizen",
+    "Partner",
+    "Dependents",
+    "tenure",
+    "PhoneService",
+    "MultipleLines",
+    "InternetService",
+    "OnlineSecurity",
+    "OnlineBackup",
+    "DeviceProtection",
+    "TechSupport",
+    "StreamingTV",
+    "StreamingMovies",
+    "Contract",
+    "PaperlessBilling",
+    "PaymentMethod",
+    "MonthlyCharges",
+    "TotalCharges",
+    "avg_monthly_spend",
+    "num_addons"
+  ],
   "feature_order": [
     "SeniorCitizen",
     "tenure",
@@ -45,40 +68,9 @@
     "2": "高風險客",
     "3": "一般客"
   },
-  "num_cols": [
-    "SeniorCitizen",
-    "tenure",
-    "MonthlyCharges",
-    "TotalCharges",
-    "avg_monthly_spend",
-    "num_addons"
-  ],
-  "cat_cols": [
-    "gender",
-    "Partner",
-    "Dependents",
-    "PhoneService",
-    "MultipleLines",
-    "InternetService",
-    "OnlineSecurity",
-    "OnlineBackup",
-    "DeviceProtection",
-    "TechSupport",
-    "StreamingTV",
-    "StreamingMovies",
-    "Contract",
-    "PaperlessBilling",
-    "PaymentMethod"
-  ],
-  "holdout_auc": 0.9163,
-  "cv_auc": 0.9138,
-  "cv_std": 0.0024,
-  "addon_cols": [
-    "OnlineSecurity",
-    "OnlineBackup",
-    "DeviceProtection",
-    "TechSupport",
-    "StreamingTV",
-    "StreamingMovies"
-  ]
+  "cv_auc": 0.916,
+  "cv_std": 0.0009,
+  "oof_auc": 0.916,
+  "oof_brier": 0.0953,
+  "n_rows": 594194
 }
