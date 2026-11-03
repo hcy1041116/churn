@@ -136,6 +136,22 @@ table.tb td code{white-space:nowrap}
 .zleaf.text ul{margin:0;padding-left:1.1em;font-size:.72rem;line-height:1.5;display:flex;flex-direction:column;gap:3px}
 .zleaf.empty{border:1.5px dashed var(--accent);color:var(--accent);font-size:.75rem;align-items:center;justify-content:center;min-height:60px}
 .zleaf.filters{background:var(--win)}
+.zleaf.legend{background:var(--win);justify-content:flex-start}
+.zl-t em{font-style:normal;font-weight:400;color:var(--muted);margin-left:4px}
+/* 列的欄位標籤（拿掉之前）、被篩掉而變淡的長條、標籤寫兩行（狀態 + 金額） */
+.hb-flrow{min-height:16px !important}
+.hb-fl{color:var(--muted);font-weight:600;font-size:.92em;white-space:nowrap}
+.hb-t i.dim,.hb-t small.dim{opacity:.25}
+.hb-t small.two{line-height:1.1;text-align:center}
+.hb.tall > .hb-row:not(.hb-flrow){min-height:38px}
+.axis.gone,.hb-fl.gone{opacity:.4;text-decoration:line-through}
+/* 設定工作簿格式窗格 */
+.wbfmt .pane-h{display:flex;justify-content:space-between}
+.wbfmt .pane-h .x{color:var(--muted);font-weight:400}
+.wbfmt .fsec{font-weight:700;font-size:11px;margin:10px 0 2px}
+.wbfmt .drow{grid-template-columns:72px minmax(0,1fr);font-size:11px}
+.wbfmt .fbtn{display:inline-block;font-size:11px;margin-top:4px}
+.vtitle.wb{font-size:12px}
 .dlist{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px}
 .dlist .card{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px 14px;display:flex;flex-direction:column;gap:4px}
 .dlist .card b{font-family:var(--display);font-size:1.05rem}

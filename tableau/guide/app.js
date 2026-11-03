@@ -140,22 +140,25 @@
   const C = {};
   function axisHTML(nm, o) {
     const tf = TICK[o.fmt || "pct"];
-    return `<div class="axis"><span></span><div class="sc">${nm.ticks.map(t => `<span style="left:${(t / nm.max * 100).toFixed(1)}%">${tf(t)}</span>`).join("")}</div>${o.axisTitle ? `<div class="at">${esc(o.axisTitle)}</div>` : ""}</div>`;
+    return `<div class="axis${o.axisGone ? " gone" : ""}" data-k="axis"><span></span><div class="sc">${nm.ticks.map(t => `<span style="left:${(t / nm.max * 100).toFixed(1)}%">${tf(t)}</span>`).join("")}</div>${o.axisTitle ? `<div class="at">${esc(o.axisTitle)}</div>` : ""}</div>`;
   }
+  // 列架上維度的欄位標籤：Tableau 預設顯示在列標頭的左上方
+  // axisGone / flabelGone：正在拿掉的那一步，淡淡畫出來讓標示找得到，下一步才真的消失
+  const flabelHTML = o => (o.flabel ? `<div class="hb-row hb-flrow"><span class="hb-fl${o.flabelGone ? " gone" : ""}" data-k="flabel">${esc(o.flabel)}</span><span></span></div>` : "");
   C.hbar = function (items, o) {
     o = o || {};
     const fmt = FMT[o.fmt || "pct"], nm = niceMax(Math.max.apply(null, items.map(i => i.v)));
-    let h = `<div class="${cls(o)} hb"${o.lw ? ` style="--lw:${o.lw}px"` : ""}>`;
+    let h = `<div class="${cls(o)} hb"${o.lw ? ` style="--lw:${o.lw}px"` : ""}>` + flabelHTML(o);
     items.forEach(i => {
-      const w = (i.v / nm.max * 100).toFixed(1);
-      h += `<div class="hb-row"><span class="hb-l" title="${esc(i.l)}">${esc(i.l)}</span><div class="hb-t"><i style="width:${w}%;background:var(${i.c || "--c1"})"></i>${o.labels ? `<small style="left:${w}%">${fmt(i.v)}</small>` : ""}</div></div>`;
+      const w = (i.v / nm.max * 100).toFixed(1), dim = i.dim ? ' class="dim"' : "";
+      h += `<div class="hb-row"><span class="hb-l" title="${esc(i.l)}">${esc(i.l)}</span><div class="hb-t"><i${dim} style="width:${w}%;background:var(${i.c || "--c1"})"></i>${o.labels ? `<small${dim} style="left:${w}%">${fmt(i.v)}</small>` : ""}</div></div>`;
     });
     if (o.axis) h += axisHTML(nm, o);
     return h + "</div>";
   };
   C.rowsAbc = function (labels, o) {
     o = o || {};
-    return `<div class="${cls(o)} hb"${o.lw ? ` style="--lw:${o.lw}px"` : ""}>` + labels.map(l => `<div class="hb-row"><span class="hb-l">${esc(l)}</span><div class="hb-t"><span class="abc">Abc</span></div></div>`).join("") + "</div>";
+    return `<div class="${cls(o)} hb"${o.lw ? ` style="--lw:${o.lw}px"` : ""}>` + flabelHTML(o) + labels.map(l => `<div class="hb-row"><span class="hb-l">${esc(l)}</span><div class="hb-t"><span class="abc">Abc</span></div></div>`).join("") + "</div>";
   };
   C.vbar = function (items, o) {
     o = o || {};
@@ -170,13 +173,14 @@
     o = o || {};
     const fmt = FMT[o.fmt || "f2"];
     const nm = niceMax(Math.max.apply(null, items.map(i => i.parts.reduce((a, b) => a + b, 0))));
-    let h = `<div class="${cls(o)} hb"${o.lw ? ` style="--lw:${o.lw}px"` : ""}>`;
+    let h = `<div class="${cls(o)} hb${o.segName ? " tall" : ""}"${o.lw ? ` style="--lw:${o.lw}px"` : ""}>` + flabelHTML(o);
     items.forEach(i => {
       let left = 0, segHTML = "";
       i.parts.forEach((v, k) => {
         const w = v / nm.max * 100;
         segHTML += `<i class="seg" style="left:${left.toFixed(1)}%;width:${w.toFixed(1)}%;background:var(${segs[k].c})"></i>`;
-        if (o.labels && w > 9) segHTML += `<small class="mid" style="left:${(left + w / 2).toFixed(1)}%">${fmt(v)}</small>`;
+        // segName：「狀態」也放在標籤上，每段寫「流失／留存」和金額（Tableau 會分兩行）
+        if (o.labels && w > 9) segHTML += `<small class="mid${o.segName ? " two" : ""}" style="left:${(left + w / 2).toFixed(1)}%">${o.segName ? esc(segs[k].n) + "<br>" : ""}${fmt(v)}</small>`;
         left += w;
       });
       h += `<div class="hb-row"><span class="hb-l">${esc(i.l)}</span><div class="hb-t">${segHTML}</div></div>`;
@@ -336,12 +340,12 @@
     "KPI 橫幅": c => C.kpi(c.kpi, cpt({ big: true })),
     "各合約類型流失率": c => C.hbar(c.contract, cpt({ labels: true })),
     "各付款方式流失率": c => C.hbar(c.payment, cpt({ labels: true, lw: 112 })),
-    "各使用月數流失率": c => C.vbar(c.tenure, cpt({ labels: true, h: 70 })),
+    "各使用月數流失率": c => C.hbar(c.tenure, cpt({ labels: true, lw: 76 })),
     "各網路服務流失率": c => C.hbar(c.internet, cpt({ labels: true, lw: 76 })),
-    "各合約月營收": c => C.stackH(c.rev, CHURN_SEGS, cpt({ labels: true, fmt: "usdM" })) + revLegend,
+    "各合約月營收": c => C.stackH(c.rev, CHURN_SEGS, cpt({ labels: true, segName: true, fmt: "usdM" })),
     "合約×網路服務": () => C.heat(D.heatI.rl, D.heatI.cl, D.heatI.M, cpt({ labels: true, rw: 84 })),
     "合約×使用月數": () => C.heat(D.heatT.rl, D.heatT.cl, D.heatT.M, cpt({ labels: true, rw: 84 })),
-    "月費分布": () => C.stackV(D.hist(D.binsSorted), CHURN_SEGS, cpt({ h: 70 })) + revLegend,
+    "月費分布": () => revLegend + C.stackV(D.hist(D.binsSorted), CHURN_SEGS, cpt({ h: 70 })),
     "各加值服務數流失率": () => C.hbar(D.addons, cpt({ labels: true, lw: 40 })),
     "客群輪廓": () => C.scatter(D.seg, cpt({ mode: "bub", color: true, labels: true, xt: "平均使用月數", yt: "平均月費" })),
     "各客群人數與流失率": () => C.dual(D.calib, { t: "客戶數", fmt: "n0" }, { t: "流失率", fmt: "pct" }, cpt({ labels: true, lw: 84 })),
@@ -355,32 +359,32 @@
   };
   const SHEETS = Object.keys(PREV);
 
-  // 6 個儀表板的版面（h = 預覽高度；link = 要開「用作篩選器」的工作表）
+  // 6 個儀表板的版面（h = 預覽高度；link = 要開「用作篩選器」的工作表；nt = 在儀表板上隱藏標題）
   const DASHES = [
     { id: "overview", n: "總覽", size: "1200 × 900", h: 640,
       link: ["各合約類型流失率", "各付款方式流失率", "各使用月數流失率", "各網路服務流失率", "各合約月營收"],
       zones: { t: "v", c: [
-        { t: "sheet", n: "KPI 橫幅", f: 0.7 },
-        { t: "h", f: 2.1, k: "第二排", c: [{ t: "sheet", n: "各合約類型流失率" }, { t: "sheet", n: "各付款方式流失率" }, { t: "sheet", n: "各使用月數流失率" }] },
-        { t: "h", f: 1.7, k: "第三排", c: [{ t: "sheet", n: "各網路服務流失率" }, { t: "sheet", n: "各合約月營收", f: 2 }] },
+        { t: "sheet", n: "KPI 橫幅", f: 0.6, nt: true },
+        { t: "h", f: 2, k: "第二排", c: [{ t: "sheet", n: "各合約類型流失率" }, { t: "sheet", n: "各付款方式流失率" }, { t: "sheet", n: "各使用月數流失率" }] },
+        { t: "h", f: 2, k: "第三排", c: [{ t: "sheet", n: "各網路服務流失率" }, { t: "sheet", n: "各合約月營收", f: 2 }] },
       ] } },
     { id: "drivers", n: "流失因子", size: "1200 × 900", h: 660,
       link: ["合約×網路服務", "合約×使用月數", "月費分布", "各加值服務數流失率"],
       zones: { t: "v", c: [
-        { t: "sheet", n: "KPI 橫幅", f: 0.7 },
+        { t: "sheet", n: "KPI 橫幅", f: 0.6, nt: true },
         { t: "h", f: 1.9, c: [{ t: "sheet", n: "合約×網路服務" }, { t: "sheet", n: "合約×使用月數" }] },
         { t: "h", f: 2, c: [{ t: "sheet", n: "月費分布", f: 1.5 }, { t: "sheet", n: "各加值服務數流失率" }] },
       ] } },
     { id: "seg", n: "客群", size: "1200 × 850", h: 620,
       link: ["客群輪廓", "各客群人數與流失率"],
       zones: { t: "v", c: [
-        { t: "sheet", n: "KPI 橫幅", f: 0.7 },
+        { t: "sheet", n: "KPI 橫幅", f: 0.6, nt: true },
         { t: "h", f: 3.6, c: [{ t: "sheet", n: "客群輪廓", f: 1.1 }, { t: "v", c: [{ t: "sheet", n: "各客群人數與流失率" }, { t: "sheet", n: "實際vs預測流失率", f: 0.8 }] }] },
       ] } },
     { id: "risk", n: "風險名單", size: "1200 × 1000", h: 760,
       link: ["現有客戶風險分級"],
       zones: { t: "v", c: [
-        { t: "sheet", n: "現有客戶 KPI", f: 0.7 },
+        { t: "sheet", n: "現有客戶 KPI", f: 0.6, nt: true },
         { t: "sheet", n: "現有客戶風險分級", f: 1.1 },
         { t: "text", lines: INS.risk, f: 0.22 },
         { t: "h", f: 2.6, c: [{ t: "sheet", n: "高風險挽留名單", f: 2.6 }, { t: "filters", f: 0.6, cards: [{ t: "合約類型", items: D.revCats }, { t: "客群", items: D.calib.map(c => c.l).sort(cmp) }] }] },
@@ -388,7 +392,7 @@
     { id: "model", n: "模型驗證", size: "1200 × 800", h: 600,
       link: ["十分位實際vs預測"],
       zones: { t: "v", c: [
-        { t: "sheet", n: "KPI 橫幅", f: 0.7 },
+        { t: "sheet", n: "KPI 橫幅", f: 0.6, nt: true },
         { t: "h", f: 3, c: [{ t: "sheet", n: "十分位實際vs預測", f: 1.2 }, { t: "sheet", n: "特徵重要度" }] },
       ] } },
     { id: "dq", n: "資料檢核", size: "1200 × 800", h: 520, link: [],
@@ -400,7 +404,9 @@
     const flex = `flex:${z.f || 1} 1 0`;
     const style = root ? `style="${flex};height:${root}px"` : `style="${flex}"`;
     if (z.t === "v" || z.t === "h") return `<div class="z${z.t}" ${style}${z.k ? ` data-k="zone:${esc(z.k)}"` : ""}>${z.c.map(c => zoneHTML(c, mini, 0, ctx)).join("")}</div>`;
-    if (z.t === "sheet") return `<div class="zleaf" ${style} data-k="zone:${esc(z.n)}"><span class="zl-t">${esc(z.n)}</span>${mini ? "" : PREV[z.n](ctx || CTX)}</div>`;
+    if (z.t === "sheet") return `<div class="zleaf" ${style} data-k="zone:${esc(z.n)}">${z.nt && !mini ? "" : `<span class="zl-t${z.nt ? " nt" : ""}" data-k="ztitle:${esc(z.n)}">${esc(z.n)}${z.nt ? "<em>（標題已隱藏）</em>" : ""}</span>`}${mini ? "" : PREV[z.n](ctx || CTX)}</div>`;
+    // Tableau 放進用了「色彩」的工作表時，自動在儀表板右邊加一欄圖例
+    if (z.t === "legend") return `<div class="zleaf legend" ${style} data-k="zone:圖例">${LG.cat(z.title, z.items)}</div>`;
     if (z.t === "text") return `<div class="zleaf text" ${style} data-k="zone:文字"><ul>${(mini ? z.lines.slice(0, 2) : z.lines).map(l => `<li>${esc(l)}</li>`).join("")}${mini && z.lines.length > 2 ? "<li>…</li>" : ""}</ul></div>`;
     if (z.t === "empty") return `<div class="zleaf empty" ${style} data-k="zone:${esc(z.k || "空容器")}">${esc(z.label || "水平容器（還是空的）")}</div>`;
     if (z.t === "filters") return `<div class="zleaf filters" ${style} data-k="zone:篩選器">${z.cards.map(c => FC(c.t, c.items)).join("")}</div>`;
@@ -410,7 +416,7 @@
   // ================================================================
   // 示意畫面
   // ================================================================
-  const menubar = () => `<div class="menubar">${["檔案", "資料", "工作表", "儀表板", "故事", "分析", "…", "伺服器", "視窗", "說明"].map(m => `<span data-k="menu:${m}">${m}</span>`).join("")}</div>`;
+  const menubar = () => `<div class="menubar">${["檔案", "資料", "工作表", "儀表板", "故事", "分析", "地圖", "格式", "伺服器", "視窗", "說明"].map(m => `<span data-k="menu:${m}">${m}</span>`).join("")}</div>`;
   function toolbar(s) {
     return `<div class="toolbar"><span class="tbb" title="撤銷">${ICON.undo}</span><span class="tbb" title="儲存">${ICON.save}</span><span class="tbb" title="新增資料來源">${ICON.newds}</span><span class="tb-sep"></span>` +
       `<span class="tbb" data-k="tb:swap" title="交換">${ICON.swap}</span><span class="tbb" data-k="tb:sortasc" title="昇冪排序">${ICON.sortAsc}</span><span class="tbb" data-k="tb:sortdesc" title="降冪排序">${ICON.sortDesc}</span><span class="tbb" data-k="tb:labels" title="顯示標記標籤">${ICON.labelT}</span>` +
@@ -458,9 +464,9 @@
     const pills = (arr, shelf) => (arr || []).map(p => `<span class="pill ${p[0]}" data-k="pill:${shelf}:${esc(p[1])}">${esc(p[1])}</span>`).join("");
     const mrow = m => `<div class="mrow" data-k="mpill:${esc(m.l)}">${MICON[m.p]}<span class="pill ${m.t}">${esc(m.l)}</span></div>`;
     const side = s.side && s.side.length;
-    return menubar() + toolbar(s) + `<div class="main${side ? " side" : ""}">` +
+    return menubar() + toolbar(s) + `<div class="main${side ? " side" : ""}">` + (s.wbfmt ? wbfmtHTML(s) :
       `<div class="datapane"><div class="pane-h">資料</div><div class="dslist">${dsListHTML(s)}</div><div class="tblname">${ICON.sheet}${esc(s.ds)}.csv</div>` +
-      `<div class="fields" data-k="fields">${dims.map(field).join("")}${!s.show || s.show.indexOf("度量名稱") >= 0 ? `<div class="field" data-k="field:度量名稱"><span class="ficon d">Abc</span><span><i>度量名稱</i></span></div>` : ""}${dims.length && meas.length ? '<div class="fsep"></div>' : ""}${meas.map(field).join("")}${more ? `<div class="ds more">⋮ 另外還有 ${more} 個欄位</div>` : ""}</div></div>` +
+      `<div class="fields" data-k="fields">${dims.map(field).join("")}${!s.show || s.show.indexOf("度量名稱") >= 0 ? `<div class="field" data-k="field:度量名稱"><span class="ficon d">Abc</span><span><i>度量名稱</i></span></div>` : ""}${dims.length && meas.length ? '<div class="fsep"></div>' : ""}${meas.map(field).join("")}${more ? `<div class="ds more">⋮ 另外還有 ${more} 個欄位</div>` : ""}</div></div>`) +
       `<div class="cards"><div class="card"><div class="card-h">頁面</div><div class="card-b"></div></div>` +
       `<div class="card"><div class="card-h">篩選條件</div><div class="card-b" data-k="shelf:filters">${pills(s.filters, "filters")}</div></div>` +
       `<div class="card"><div class="card-h">標記</div><div class="card-b"><div class="marktype" data-k="mark:type"><span>${esc(s.markType || "自動")}</span><span>▾</span></div>` +
@@ -470,8 +476,16 @@
       (s.mv ? `<div class="card" data-k="card:度量值"><div class="card-h">度量值</div><div class="card-b">${s.mv.map(l => `<span class="pill m">${esc(l)}</span>`).join("")}</div></div>` : "") +
       `</div><div class="canvas"><div class="shelf"><span class="shelf-l">${ICON.cols}欄</span><div class="shelf-a" data-k="shelf:cols">${pills(s.cols, "cols")}</div></div>` +
       `<div class="shelf"><span class="shelf-l">${ICON.rows}列</span><div class="shelf-a" data-k="shelf:rows">${pills(s.rows, "rows")}</div></div>` +
-      `<div class="view"><div class="vtitle" data-k="title">${esc(s.title)}</div><div class="vbody" data-k="view">${V(s.view)}</div></div></div>` +
+      `<div class="view"><div class="vtitle${s.wbTitle ? " wb" : ""}" data-k="title">${esc(s.title)}</div><div class="vbody" data-k="view">${V(s.view)}</div></div></div>` +
       (side ? `<div class="sidecol">${s.side.map(sideHTML).join("")}</div>` : "") + `</div>` + tabbarHTML(s);
+  }
+  // 只畫官方文件確認過的兩列（工作表標題、格線），其他列用灰色橫條代替
+  function wbfmtHTML(s) {
+    const row = (k, v) => `<div class="drow" data-k="fmt:${k}"><span>${k}</span><span class="sel">${v} ▾</span></div>`;
+    return `<div class="datapane wbfmt" data-k="fmtpane"><div class="pane-h">設定工作簿格式<span class="x">✕</span></div>` +
+      `<div class="fsec">字型</div><i class="ph"></i><i class="ph"></i>${row("工作表標題", s.wbTitle ? "12　<b>B</b>" : "Tableau Book")}<i class="ph"></i>` +
+      `<div class="fsec">線條</div>${row("格線", s.wbGrid ? "無" : "——")}<i class="ph"></i><i class="ph"></i>` +
+      `<div class="fsec"></div><span class="fbtn">重設為預設值</span></div>`;
   }
   function startHTML() {
     return menubar() + `<div class="scr scr-start"><div class="st-left"><div class="st-h">連線</div><div class="st-sub">到檔案</div><span class="st-i">Microsoft Excel</span><span class="st-i" data-k="start:文字檔">文字檔</span><i class="ph"></i><i class="ph"></i><i class="ph"></i><div class="st-sub">到伺服器</div><i class="ph"></i><i class="ph"></i></div>` +
@@ -734,10 +748,20 @@
       short: "顯示數字標籤", doo: "點「標記」卡的 <b>標籤</b> 方塊 → 在跳出的小視窗勾 <b>顯示標記標籤</b>。",
       see, set, hl: { "mark:slot": 1, "ov:顯示標記標籤": 2 }, ov: [{ type: "menu", at: "mark:slot", items: [Object.assign(mi("顯示標記標籤"), { ck: true }), PH, PH] }],
     }),
-    fit: (mode, see) => ({
+    fit: (mode, see, extra) => ({
       short: `檢視大小改成「${mode}」`, doo: `點工具列上寫著「標準」的 <b>適合</b> 下拉選單 → 選 <b>${mode}</b>。`,
       see: see || (mode === "整個檢視" ? "圖會撐滿整個檢視區，之後放進儀表板才不會被裁掉或出現捲軸。" : "表格寬度會配合畫面，欄位不會擠在左邊。"),
-      set: { fit: mode }, hl: { "tb:fit": 1, ["ov:" + mode]: 2 }, ov: [{ type: "menu", at: "tb:fit", items: [mi("標準"), mi("適合寬度"), mi("適合高度"), mi("整個檢視")] }],
+      set: Object.assign({ fit: mode }, extra || {}), hl: { "tb:fit": 1, ["ov:" + mode]: 2 }, ov: [{ type: "menu", at: "tb:fit", items: [mi("標準"), mi("適合寬度"), mi("適合高度"), mi("整個檢視")] }],
+    }),
+    // 長條上已經有數字標籤，軸和欄位標籤是多餘的（官方用語：顯示標頭、隱藏列的欄位標籤）
+    hideAxis: (see, set) => ({
+      short: "拿掉下面的軸", doo: "在圖下方的軸（寫著刻度數字的那一排）按 <b>右鍵</b> → 點有打勾的 <b>顯示標頭</b>，把勾拿掉。",
+      see, set, note: "官方說明文件有的地方把這個選項寫成「顯示標題」，是同一個。要把軸叫回來：在「欄」架上的膠囊按右鍵 → 再勾一次。",
+      hl: { axis: 1, "ov:顯示標頭": 2 }, ov: [{ type: "menu", at: "axis", pos: "above", items: [PH, PH, Object.assign(mi("顯示標頭"), { ck: true }), PH, PH] }],
+    }),
+    hideRowLabel: (field, see, set) => ({
+      short: "拿掉左上角的欄位標籤", doo: `在長條左上方、寫著「${esc(field)}」的那一格按 <b>右鍵</b> → 點 <b>隱藏列的欄位標籤</b>。`,
+      see, set, hl: { flabel: 1, "ov:隱藏列的欄位標籤": 2 }, ov: [{ type: "menu", at: "flabel", pos: "right", items: [PH, PH, mi("隱藏列的欄位標籤"), PH] }],
     }),
     sortDesc: (see, set) => ({ short: "由高到低排序", doo: "點工具列的 <b>降冪排序</b> 按鈕（長條由長到短的圖示）。", see, set, hl: { "tb:sortdesc": 1 } }),
     rename: (name, tabs, see) => ({
@@ -836,34 +860,40 @@
     [step.rename("KPI 橫幅", done("KPI 橫幅"))]),
   };
   const ax = (title, fmt) => ({ axis: true, axisTitle: title, fmt });
+  // 5-2 的圖：拿掉軸和欄位標籤之前，左上角有「合約類型」、下面有流失率的軸
+  const cv = o => Object.assign(ax("流失率"), { flabel: "合約類型" }, o);
   W.contract = {
     id: "5-2", name: "各合約類型流失率", src: "churn_dashboard.csv", base: base("各合約類型流失率", DS_MAIN, ["合約類型", "付款方式", "使用月數分組", "網路服務", "客戶數", "流失率"]),
     steps: [
       step.newSheet(DS_MAIN),
-      step.drag("合約類型", "d", "rows", { rows: [["d", "合約類型"]], view: { k: "rows", labels: alpha(D.contract).map(i => i.l) } },
-        "檢視區左邊出現三列：Month-to-month、One year、Two year。每列先顯示 Abc，因為還沒有數字。"),
-      step.drag("流失率", "m", "cols", { cols: [["m", "AVG(流失率)"]], slot: "標籤", view: { k: "hbar", items: alpha(D.contract), o: ax("流失率") } },
+      step.drag("合約類型", "d", "rows", { rows: [["d", "合約類型"]], view: { k: "rows", labels: alpha(D.contract).map(i => i.l), o: { flabel: "合約類型" } } },
+        "檢視區左邊出現三列：Month-to-month、One year、Two year。每列先顯示 Abc，因為還沒有數字。左上角那格「合約類型」是欄位標籤，最後會拿掉。"),
+      step.drag("流失率", "m", "cols", { cols: [["m", "AVG(流失率)"]], slot: "標籤", view: { k: "hbar", items: alpha(D.contract), o: cv() } },
         "每一列變成一條橫向長條，越長代表流失率越高。「標記」卡的「文字」方塊變成「標籤」，因為現在畫的是長條圖。", AVG_NOTE),
       step.drag("客戶數", "m", "tooltip", { marks: [{ p: "tooltip", t: "m", l: "SUM(客戶數)" }] },
         "畫面看起來不會變。滑鼠移到長條上時，跳出的小框會多一行客戶數。"),
-      step.labels(`長條尾端出現 ${D.contract.map(c => pct(c.v)).join("、")}。`, { view: { k: "hbar", items: alpha(D.contract), o: Object.assign(ax("流失率"), { labels: true }) } }),
+      step.labels(`長條尾端出現 ${D.contract.map(c => pct(c.v)).join("、")}。`, { view: { k: "hbar", items: alpha(D.contract), o: cv({ labels: true }) } }),
       step.sortDesc("最長的排到最上面。合約類型這張本來就剛好由高到低，看不出變化是正常的；付款方式那張就看得出來。",
-        { view: { k: "hbar", items: desc(D.contract), o: Object.assign(ax("流失率"), { labels: true }) } }),
-      step.fit("整個檢視"),
+        { view: { k: "hbar", items: desc(D.contract), o: cv({ labels: true }) } }),
+      step.hideAxis("軸和軸下面的「流失率」都不見了。每條長條尾端已經寫了數字，軸只是多一排字。",
+        { view: { k: "hbar", items: desc(D.contract), o: cv({ labels: true, axisGone: true }) } }),
+      step.hideRowLabel("合約類型", "左上角的「合約類型」不見了，只剩三種合約的名字和長條。圖的標題已經說了這是合約類型。",
+        { view: { k: "hbar", items: desc(D.contract), o: { labels: true, flabel: "合約類型", flabelGone: true } } }),
+      step.fit("整個檢視", null, { view: { k: "hbar", items: desc(D.contract), o: { labels: true } } }),
       step.rename("各合約類型流失率", done("各合約類型流失率")),
     ],
   };
-  const revAxis = ax("月營收", "usdM");
+  const rv = o => Object.assign(ax("月營收", "usdM"), { flabel: "合約類型" }, o);
   W.revenue = {
     id: "5-6", name: "各合約月營收", src: "churn_dashboard.csv", base: base("各合約月營收", DS_MAIN, ["合約類型", "狀態", "月營收", "流失月營收"]),
     steps: [
       step.newSheet(DS_MAIN),
-      step.drag("合約類型", "d", "rows", { rows: [["d", "合約類型"]], view: { k: "rows", labels: D.revCats } }, "左邊出現三種合約。"),
-      step.drag("月營收", "m", "cols", { cols: [["m", "SUM(月營收)"]], slot: "標籤", view: { k: "hbar", items: D.revTotal, o: revAxis } },
+      step.drag("合約類型", "d", "rows", { rows: [["d", "合約類型"]], view: { k: "rows", labels: D.revCats, o: { flabel: "合約類型" } } }, "左邊出現三種合約。"),
+      step.drag("月營收", "m", "cols", { cols: [["m", "SUM(月營收)"]], slot: "標籤", view: { k: "hbar", items: D.revTotal, o: rv() } },
         "每種合約一條長條，長度是這種合約全部客戶的月費加總。", "軸上是一長串數字而不是 $10M 的話，代表第 4 章的金額格式還沒設。"),
       step.drag("狀態", "d", "color", {
         marks: [{ p: "color", t: "d", l: "狀態" }], side: [{ k: "cat", t: "狀態", items: [["流失", "--c1"], ["留存", "--c2"]] }],
-        view: { k: "stackH", items: D.rev, segs: [{ n: "流失", c: "--c1" }, { n: "留存", c: "--c2" }], o: revAxis },
+        view: { k: "stackH", items: D.rev, segs: [{ n: "流失", c: "--c1" }, { n: "留存", c: "--c2" }], o: rv() },
       }, "每條長條切成兩段：流失客戶的營收、留下來客戶的營收。右邊出現「狀態」的圖例。", "預設顏色是 Tableau 自動配的，下一步改成「流失＝紅、留存＝灰」，比較直覺。"),
       {
         short: "打開「編輯色彩」", doo: "滑鼠移到右邊「狀態」圖例上，點右上角出現的 <b>▼</b> → 點 <b>編輯色彩…</b>。", see: "跳出「編輯色彩」視窗。",
@@ -872,12 +902,20 @@
       {
         short: "流失改紅色、留存改灰色", doo: "左邊點 <b>流失</b>，右邊色板點一個紅色；再點 <b>留存</b>，右邊點一個灰色 → <b>確定</b>。",
         see: "流失那段變紅、留存變灰，一眼就看得出流失帶走多少營收。",
-        set: { side: [{ k: "cat", t: "狀態", items: [["流失", "--c-churn"], ["留存", "--c-stay"]] }], view: { k: "stackH", items: D.rev, segs: CHURN_SEGS, o: revAxis } },
+        set: { side: [{ k: "cat", t: "狀態", items: [["流失", "--c-churn"], ["留存", "--c-stay"]] }], view: { k: "stackH", items: D.rev, segs: CHURN_SEGS, o: rv() } },
         hl: { "dl:項目": 1, "dl:色板": 2 }, ov: [{ type: "dialog", pos: "center", title: "編輯色彩 [狀態]", body: DLG.colors(true) }],
       },
       step.labels(`每一段裡出現金額。Month-to-month 流失的月營收（${usdM(D.rev[0].parts[0])}）幾乎和留下來的（${usdM(D.rev[0].parts[1])}）一樣多。`,
-        { view: { k: "stackH", items: D.rev, segs: CHURN_SEGS, o: Object.assign({ labels: true }, revAxis) } }),
-      step.fit("整個檢視"),
+        { view: { k: "stackH", items: D.rev, segs: CHURN_SEGS, o: rv({ labels: true }) } }),
+      step.drag("狀態", "d", "label", {
+        marks: [{ p: "color", t: "d", l: "狀態" }, { p: "label", t: "d", l: "狀態" }], view: { k: "stackH", items: D.rev, segs: CHURN_SEGS, o: rv({ labels: true, segName: true }) },
+      }, "每一段多寫了「流失」或「留存」。圖自己就說明了顏色，放進儀表板後不需要圖例，可以省下右邊一整欄。",
+      "金額不見了、只剩流失／留存的話，再把 <b>月營收</b> 也拖到「標籤」。太短的段（例如 Two year 的流失）放不下字，Tableau 會自動省略，是正常的。"),
+      step.hideAxis("下面的金額軸不見了。每一段已經寫了金額。",
+        { view: { k: "stackH", items: D.rev, segs: CHURN_SEGS, o: rv({ labels: true, segName: true, axisGone: true }) } }),
+      step.hideRowLabel("合約類型", "左上角的「合約類型」不見了。",
+        { view: { k: "stackH", items: D.rev, segs: CHURN_SEGS, o: { labels: true, segName: true, fmt: "usdM", flabel: "合約類型", flabelGone: true } } }),
+      step.fit("整個檢視", null, { view: { k: "stackH", items: D.rev, segs: CHURN_SEGS, o: { labels: true, segName: true, fmt: "usdM" } } }),
       step.rename("各合約月營收", done("各合約月營收")),
     ],
   };
@@ -1162,6 +1200,28 @@
       },
     ],
   };
+  // 整本工作簿的格式：標題字級、格線。已經做好的工作表也會一起變
+  const FIELD4 = {
+    id: "4-4", name: "整本工作簿：標題變小、拿掉格線", base: FIELD1.base,
+    steps: [
+      {
+        short: "格式 → 工作簿…", doo: "點上方選單 <b>格式</b> → <b>工作簿…</b>（在選單下半部）。", see: "左邊的「資料」窗格換成「設定工作簿格式」窗格。",
+        set: { wbfmt: true }, hl: { "menu:格式": 1, "ov:工作簿…": 2 }, ov: [{ type: "menu", at: "menu:格式", items: [PH, PH, PH, PH, PH, mi("工作簿…"), PH] }],
+      },
+      {
+        short: "工作表標題：12、粗體", doo: "在 <b>字型</b> 那一區找到 <b>工作表標題</b>，點它右邊的下拉選單 → 字級選 <b>12</b>、按 <b>B</b>（粗體）。",
+        see: "每張工作表的標題都變小、變粗。預設的標題很大，放進儀表板後會比圖還搶眼。", set: { wbTitle: true }, hl: { "fmt:工作表標題": 1, title: 2 },
+      },
+      {
+        short: "格線：無", doo: "往下在線條那一區找到 <b>格線</b>，點它右邊的下拉選單 → 選 <b>無</b>。",
+        see: "所有圖背景的格線都不見了。長條上會直接寫數字，格線只是多出來的線。", set: { wbGrid: true }, hl: { "fmt:格線": 1 },
+      },
+      {
+        short: "關掉窗格", doo: "點窗格右上角的 <b>✕</b>。", see: "「資料」窗格回來了。", set: { wbfmt: false }, hl: { fields: 1 },
+        note: "這是整本工作簿的設定：已經做好的工作表會一起變，之後新做的也會套用。想還原的話，重新打開這個窗格，按下面的 <b>重設為預設值</b>。",
+      },
+    ],
+  };
   const FIELD_SETTINGS = [
     ["churn_dashboard：<b>流失率</b>", "平均值", "百分比，小數 1"],
     ["churn_dashboard：<b>預測流失機率</b>", "平均值", "百分比，小數 1"],
@@ -1176,8 +1236,12 @@
 
   const ALLTABS = SHEETS.slice();
   const dzone = id => clone(DASHES.find(d => d.id === id).zones);
-  const ovZ = dzone("overview");
+  const ovZ = dzone("overview");  // 做完的樣子：KPI 沒有標題、第三排 1/3 : 2/3
   const ovRow2 = ovZ.c[1];
+  // 做到一半的樣子：剛拖進來時 KPI 還有標題、第三排兩張一樣寬
+  const ovStart = (z => { z.c[0].nt = false; z.c[2].c.forEach(c => { c.f = 1; }); return z; })(clone(ovZ));
+  const ovNoTitle = (z => { z.c[0].nt = true; return z; })(clone(ovStart));
+  const withLegend = z => ({ t: "h", c: [Object.assign(clone(z), { f: 6 }), { t: "legend", f: 1, title: "狀態", items: [["流失", "--c-churn"], ["留存", "--c-stay"]] }] });
   const LINK_OV = DASHES[0].link;
   const DASH1 = {
     id: "11-1", name: "組「總覽」儀表板並開啟連動", base: { screen: "dash", tabs: ALLTABS.concat(["儀表板 1"]), dtabs: ["儀表板 1"], active: ALLTABS.length, title: "儀表板 1", size: "預設大小", showTitle: false, sheetList: SHEETS.slice(0, 6) },
@@ -1205,17 +1269,36 @@
       },
       {
         short: "第三排：網路服務和月營收", doo: "再拖一個 <b>水平</b> 到第二排的<b>下緣</b>，然後把 <b>各網路服務流失率</b>、<b>各合約月營收</b> 依序拖進去。",
-        see: "第三排左邊是網路服務、右邊是各合約月營收。", set: { zones: ovZ }, hl: { "obj:水平": 1, "zone:第三排": 2 },
+        see: "第三排左邊是網路服務、右邊是各合約月營收。同時儀表板最右邊多出一欄「狀態」圖例：工作表用了「色彩」，Tableau 就會自動把圖例加進來。",
+        set: { zones: withLegend(ovStart) }, hl: { "obj:水平": 1, "zone:第三排": 2, "zone:圖例": 3 },
+      },
+      {
+        short: "刪掉右邊的圖例", doo: "點一下右邊的「狀態」圖例選取它（外框變粗）→ 點外框右上角的 <b>✕</b>。",
+        see: "圖例不見了，右邊那一欄的寬度還給圖。「各合約月營收」的每一段已經寫了流失／留存（5-6），不需要圖例。",
+        note: "右邊還留著一條空白的話，點那條空白選取它，一樣按 ✕。只是從儀表板拿掉，工作表本身不受影響。5-6 沒有把「狀態」拖到「標籤」的話，先回去補做那一步。",
+        set: { zones: ovStart }, hl: { "zone:各合約月營收": 1 },
+      },
+      {
+        short: "藏起 KPI 橫幅的標題", doo: "在 KPI 橫幅上方的標題「KPI 橫幅」按 <b>右鍵</b> → 點 <b>隱藏標題</b>。",
+        see: "標題不見了，數字往上貼齊。每個數字上面已經有欄名，不需要再一個標題。", set: { zones: ovNoTitle },
+        hl: { "ztitle:KPI 橫幅": 1, "ov:隱藏標題": 2 }, ov: [{ type: "menu", at: "ztitle:KPI 橫幅", pos: "right", items: [PH, mi("隱藏標題"), PH, PH] }],
       },
       {
         short: "第二排平均分寬度", doo: "點第二排容器的邊緣選取它（外框變粗）→ 右上角 <b>▼</b> → <b>均勻分佈</b>。",
         see: "三張圖變成一樣寬。", note: "選不到容器的話，先點容器裡任一張圖，再從它右上角的 ▼ 選 <b>選取容器</b>。",
         hl: { "zone:第二排": 1, "ov:均勻分佈": 2 }, ov: [{ type: "menu", at: "zone:第二排", items: [PH, mi("均勻分佈"), PH, mi("移除容器")] }],
       },
-      { short: "調整每排高度", doo: "滑鼠移到兩排之間的分隔線，游標變成上下箭頭時往上拖，讓 KPI 橫幅那排矮一點（大約占 1/6）。", see: "版面跟第 0 章「成品長這樣」的總覽差不多。", hl: { "zone:KPI 橫幅": 1 } },
+      {
+        short: "第三排：網路服務窄一點", doo: "滑鼠移到第三排兩張圖中間的分隔線，游標變成左右箭頭時往左拖，讓「各網路服務流失率」跟上面的「各合約類型流失率」一樣寬。",
+        see: "網路服務只有三條長條，1/3 寬就夠；各合約月營收拿到 2/3。上下兩排的分隔線對齊，版面看起來整齊。", set: { zones: ovZ }, hl: { "zone:各網路服務流失率": 1, "zone:各合約月營收": 2 },
+      },
+      {
+        short: "調整每排高度", doo: "滑鼠移到兩排之間的分隔線，游標變成上下箭頭時拖動：KPI 那排矮一點（大約占 1/6），第二排和第三排一樣高。",
+        see: "版面跟第 0 章「成品長這樣」的總覽一樣。", hl: { "zone:KPI 橫幅": 1, "zone:第二排": 2, "zone:第三排": 3 },
+      },
       {
         short: "開啟連動：用作篩選器", doo: "點一下 <b>各使用月數流失率</b> 選取它 → 點它右上角的 <b>▼</b> → 點 <b>用作篩選器</b>。",
-        see: "選單關掉。之後在這張圖上點任何一根直條，儀表板上其他工作表都會篩成那一組客戶。",
+        see: "選單關掉。之後在這張圖上點任何一條長條，儀表板上其他工作表都會篩成那一組客戶。",
         note: "選取工作表後，右上角的小工具列也有一個漏斗圖示，點它效果一樣。",
         hl: { "zone:各使用月數流失率": 1, "ov:用作篩選器": 2 }, ov: [{ type: "menu", at: "zone:各使用月數流失率", items: [PH, mi("用作篩選器"), PH, PH] }],
       },
@@ -1225,8 +1308,8 @@
         hl: { "zone:各合約類型流失率": 1, "zone:各付款方式流失率": 2, "zone:各網路服務流失率": 3, "zone:各合約月營收": 4 },
       },
       {
-        short: "試試看：點「0-12 個月」", doo: "在「各使用月數流失率」點 <b>0-12 個月</b> 那根直條。", set: { full: true, demo: true },
-        see: `整頁都變成「加入 12 個月內」這群客戶：KPI 變成 ${CTX_DEMO.kpi.map(k => `${k[0]} ${k[1]}`).join("、")}；合約、付款方式、網路服務、月營收也都只算這群人。點的那張圖本身不會被篩，只是其他直條變淡。`,
+        short: "試試看：點「0-12 個月」", doo: "在「各使用月數流失率」點 <b>0-12 個月</b> 那條長條。", set: { full: true, demo: true },
+        see: `整頁都變成「加入 12 個月內」這群客戶：KPI 變成 ${CTX_DEMO.kpi.map(k => `${k[0]} ${k[1]}`).join("、")}；合約、付款方式、網路服務、月營收也都只算這群人。點的那張圖本身不會被篩，只是其他長條變淡。`,
         hl: { "zone:KPI 橫幅": 1, "zone:各使用月數流失率": 2 },
       },
       {
@@ -1235,6 +1318,8 @@
       },
     ],
   };
+  // 11-1 的第幾步（其他段落引用用，步驟增減時不用手改）
+  const d1 = short => { const i = DASH1.steps.findIndex(x => x.short === short); if (i < 0) throw new Error("DASH1 沒有這一步：" + short); return i + 1; };
   const DASH2 = {
     id: "11-7", name: "收尾：隱藏個別工作表", base: { screen: "dash", tabs: ALLTABS.concat(DASH_NAMES), dtabs: DASH_NAMES.slice(), active: ALLTABS.length, title: "總覽", size: "固定大小（1200 × 900）", showTitle: true, zones: ovZ, sheetList: SHEETS.slice(0, 6) },
     steps: [
@@ -1366,7 +1451,7 @@
       SP(CONNECT2),
       P("最後照 3-2 再接一次 <code>data_quality.csv</code>。接完「資料」窗格會有 3 個資料來源。"),
     ] },
-    { id: "fields", no: 4, grp: "接資料", nav: "欄位設定", title: "欄位設定：預設彙總和數字格式", lead: "這章決定每個數字欄位拖進圖裡時要「加總」還是「平均」，以及怎麼顯示。設一次，之後每張圖都套用。", blocks: () => [
+    { id: "fields", no: 4, grp: "接資料", nav: "預設設定", title: "預設設定：彙總、數字格式、工作簿格式", lead: "這章的設定都只做一次：每個數字欄位拖進圖裡時要「加總」還是「平均」、數字怎麼顯示，以及整本工作簿的標題大小和格線。之後每張圖都套用。", blocks: () => [
       SP(FIELD1),
       SP(FIELD2),
       SP(FIELD3),
@@ -1374,6 +1459,9 @@
       P("每一列都照上面的方法做：在「資料」窗格對欄位按右鍵 → 預設屬性 → 彙總 / 數位格式。"),
       { t: "check", id: "fields", hd: ["欄位", "預設屬性 → 彙總", "預設屬性 → 數位格式"], rows: FIELD_SETTINGS },
       { t: "callout", kind: "info", html: "「平均值」那 4 個一定要改，不然流失率會變成流失人數。數字格式不做不會壞，只是會顯示成 0.2252、39137314 這種樣子。" },
+      H("整本工作簿的格式"),
+      P("Tableau 預設的工作表標題很大、每張圖都有格線，拼成儀表板會很雜。在這裡改一次，所有工作表（包括已經做好的）都會套用。"),
+      SP(FIELD4),
     ] },
     { id: "p1", no: 5, grp: "做工作表", nav: "總覽頁（6 張）", title: "「總覽」頁的 6 張工作表", lead: "一張工作表只放一張圖。這章做 6 張，第 11 章才把它們拼成「總覽」儀表板並開啟連動。", blocks: () => [
       { t: "dashmini", id: "overview" },
@@ -1381,9 +1469,9 @@
       SP(W.contract),
       repeatBlock("5-3、5-4、5-5　照 5-2 再做三張", [
         ["<b>各付款方式流失率</b>", "付款方式", "流失率", "客戶數", "要，降冪排序"],
-        ["<b>各使用月數流失率</b>", "流失率", "使用月數分組", "客戶數", "不要。這張是直條圖，所以列和欄跟 5-2 相反"],
+        ["<b>各使用月數流失率</b>", "使用月數分組", "流失率", "客戶數", "不要，保持 0-12 → 49 個月以上"],
         ["<b>各網路服務流失率</b>", "網路服務", "流失率", "客戶數", "要，降冪排序"],
-      ], ["各付款方式流失率", "各使用月數流失率", "各網路服務流失率"], "使用月數分組的名稱刻意用數字開頭（0-12 個月、13-24 個月…），Tableau 預設的排序剛好就是月數順序，所以不用排序。"),
+      ], ["各付款方式流失率", "各使用月數流失率", "各網路服務流失率"], "每張都要做完 5-2 的全部步驟，包括顯示標籤、拿掉軸和欄位標籤。使用月數分組的名稱刻意用數字開頭（0-12 個月、13-24 個月…），Tableau 預設的排序剛好就是月數順序，所以不用排序。付款方式的名字被截成「Bank transfer (auto…」的話：滑鼠移到名字那一欄的右邊界，游標變成左右箭頭時往右拖。"),
       SP(W.revenue),
     ] },
     { id: "p2", no: 6, grp: "做工作表", nav: "流失因子頁（4 張）", title: "「流失因子」頁的 4 張工作表", lead: "哪些客戶組合最容易流失：兩張熱圖、月費分布、加值服務數。", blocks: () => [
@@ -1419,7 +1507,7 @@
     { id: "dashboards", no: 11, grp: "組裝與發布", nav: "組成儀表板", title: "組成 6 個儀表板，開啟連動", lead: "儀表板是一頁版面：把做好的工作表拖進去排好，再對每張圖開「用作篩選器」，整頁就會連動。先詳細做一次「總覽」，其他 5 頁照版面圖放。", blocks: () => [
       SP(DASH1),
       H("其他 5 個儀表板"),
-      P("每個都照 11-1 的第 1～4 步開始：新建儀表板 → 改名 → 大小 → 顯示儀表板標題。然後照版面圖放工作表，再對列出的工作表開「用作篩選器」（11-1 第 11 步）。"),
+      P(`每個都照 11-1 的第 1～4 步開始：新建儀表板 → 改名 → 大小 → 顯示儀表板標題。然後照版面圖放工作表：KPI 照第 ${d1("藏起 KPI 橫幅的標題")} 步隱藏標題；自動長出來的圖例照第 ${d1("刪掉右邊的圖例")} 步處理（哪些要留，看各頁的說明）；並排的圖讓分隔線上下對齊。最後對列出的工作表開「用作篩選器」（11-1 第 ${d1("開啟連動：用作篩選器")} 步）。`),
       { t: "dashplan" },
       SP(DASH2),
     ] },
@@ -1444,9 +1532,12 @@
     ] },
   ];
   const FAQ = [
-    ["在儀表板上點了圖，其他圖和 KPI 沒有跟著變", "那張圖沒開「用作篩選器」，或其他圖用的不是 churn_dashboard 這個資料來源。", "選取那張圖 → 右上角 <b>▼</b> → <b>用作篩選器</b>（11-1 第 11 步）。確認每張互動的圖，「資料」窗格點的都是 churn_dashboard。特徵重要度和資料檢核本來就不會變。"],
+    ["在儀表板上點了圖，其他圖和 KPI 沒有跟著變", "那張圖沒開「用作篩選器」，或其他圖用的不是 churn_dashboard 這個資料來源。", `選取那張圖 → 右上角 <b>▼</b> → <b>用作篩選器</b>（11-1 第 ${d1("開啟連動：用作篩選器")} 步）。確認每張互動的圖，「資料」窗格點的都是 churn_dashboard。特徵重要度和資料檢核本來就不會變。`],
     ["流失率顯示成 133,817 之類的大數字", "流失率這欄每位客戶是 0 或 1，Tableau 預設把它加總了，加起來就是流失人數。", "做第 4 章的 4-1：流失率的預設彙總改成 <b>平均值</b>。已經做好的圖，對膠囊按右鍵，在彙總的選項選平均值。"],
-    ["金額顯示成 NT$39.1M", "用了「貨幣」格式，Tableau 會照 Windows 的地區設定（台灣）加上 NT$，但這份資料是美元。", "對金額欄位按右鍵 → 預設屬性 → 數位格式… → 改選 <b>數字（自訂）</b>，<b>首碼/尾碼</b> 的首碼填 <b>$</b>（4-3）。"],
+    ["儀表板右邊多出一欄（圖例或空白）", "放進用了「色彩」的工作表時，Tableau 會自動在儀表板右邊加一欄圖例。", `點圖例選取它 → 右上角 <b>✕</b>（11-1 第 ${d1("刪掉右邊的圖例")} 步）。還留一條空白的話，點空白處一樣按 ✕。需要留的圖例（例如月費分布的流失／留存），拖到它說明的那張圖上方放開。`],
+    ["圖看起來很雜：標題很大、有格線、下面有軸、左上角有欄位名稱", "這些都是 Tableau 的預設值。", "標題和格線：做 4-4（整本一次改）。軸和欄位名稱：每張長條圖照 5-2 最後兩步，軸上右鍵取消勾 <b>顯示標頭</b>、欄位名稱上右鍵 <b>隱藏列的欄位標籤</b>。在工作表改，儀表板會自動跟著變。"],
+    ["KPI 的欄名是「平均值 流失率」或只剩「平均值」", "度量名稱的別名沒改到，或改成了錯的字。", "欄位清單最下面斜體的 <b>度量名稱</b> 右鍵 → <b>別名…</b> → 在「值（別名）」那欄把那一格整格改成 <b>流失率</b>（5-1）。"],
+    ["金額顯示成 NT$39.1M", "用了「貨幣」格式，Tableau 會照 Windows 的地區設定（台灣）加上 NT$，但這份資料是美元。", "對金額欄位按右鍵 → 預設屬性 → 數位格式… → 改選 <b>數字（自訂）</b>，<b>首碼/尾碼</b> 的首碼填 <b>$</b>（4-3）。月營收、流失月營收、預期流失月營收三個都要改。"],
     ["中文變亂碼（例如 å®¢æˆ¶æ•¸）", "Tableau 用錯文字編碼讀檔。", "回到 <b>資料來源</b> 分頁 → 畫布上檔案右邊的 <b>▼</b> → <b>文字檔屬性</b> → <b>字元集</b> 選 <b>UTF-8</b>。也確認檔案沒有先用 Excel 打開再存過（Excel 可能改掉編碼）。"],
     ["欄位旁出現橘色鍊條或紅色驚嘆號，數字變成 * 或空白", "同一張工作表混用了兩個資料來源的欄位，Tableau 在嘗試「資料混合」。", "一張工作表只用一個資料來源。把錯的膠囊拖出架子（拖到空白處放開就會移除），確認「資料」窗格點的是對的資料來源再重拖。"],
     ["把第二個檔案拖到畫布上，出現「關係」設定", "在同一個資料來源裡放兩個沒有共同欄位的檔案。", "在畫布上對多拖進來的檔案按右鍵 → <b>移除</b>，再照 3-2 用 <b>資料 → 新資料來源</b> 另外接。"],
@@ -1454,8 +1545,8 @@
   ];
   // 其他 5 個儀表板的額外說明
   const PLAN_NOTE = {
-    drivers: "KPI 橫幅就是總覽那張，同一張工作表可以放進好幾個儀表板。",
-    seg: "點客群輪廓的某個圓，KPI 會變成那個客群的數字。",
+    drivers: "KPI 橫幅就是總覽那張，同一張工作表可以放進好幾個儀表板。放進兩張熱圖和月費分布後，右邊會長出三個圖例：兩個熱圖的顏色圖例刪掉（格子裡已經寫了數字）；「狀態」圖例要留，把它拖到「月費分布」的上緣放開，它就會待在那張圖上方，右邊那一欄跟著消失。",
+    seg: "點客群輪廓的某個圓，KPI 會變成那個客群的數字。客群輪廓會帶進兩個圖例：大小（客戶數）刪掉；色彩（流失率）要留，拖到客群輪廓的下緣放開。",
     risk: "右邊兩張篩選器不用另外拖：「高風險挽留名單」放進來時會自動帶進來。為了讓它們也篩選 KPI 和風險分級：點篩選器右上角 ▼ → <b>應用於工作表</b> → <b>選定工作表</b> → 按 <b>儀表板上的所有項</b> → 確定。最後把下面的說明文字用「物件 → 文字」放在名單上方。",
     model: "點某一組直條，KPI 會變成那 10% 客戶的數字。特徵重要度是另一個資料來源，不會跟著變。",
     dq: "從「物件」把「文字」拖到表格右邊，貼上下面的指標定義。",
