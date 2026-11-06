@@ -10,8 +10,6 @@ dependencies = [
     "matplotlib>=3.11.0",
     "numpy==2.2.1",
     "pandas==2.2.3",
-    "psycopg2-binary==2.9.10",
     "scikit-learn==1.8.0",
-    "sqlalchemy==2.0.36",
     "streamlit==1.40.2",
 ]

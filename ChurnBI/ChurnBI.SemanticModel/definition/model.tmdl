@@ -1,6 +1,0 @@
-model ChurnBI
-	culture: en-US
-	defaultPowerBIDataSourceVersion: powerBI_V3
-	sourceQueryCulture: en-US
-
-ref table ChurnBI

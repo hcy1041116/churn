@@ -1,9 +1,9 @@
 """
-把 churn 資料 + 模型預測 + 客群標籤輸出成 Tableau／Power BI 用的 CSV（放在 tableau/）。
+把 churn 資料 + 模型預測 + 客群標籤輸出成 Tableau 用的 CSV（放在 tableau/）。
 
-使用 train_and_save.py 存的模型和 oof_predictions.csv（不重新訓練、不寫資料庫），所以要先跑過 train_and_save.py：
-- churn_mart.csv：每位客戶一列的明細（原始特徵 + 是否流失 + 預測流失機率 + 客群 + 使用月數分組）。
-  預測流失機率是交叉驗證的 out-of-fold 機率；Power BI 報表（ChurnBI/）讀這個檔
+使用 train_and_save.py 存的模型和 oof_predictions.csv（不重新訓練），所以要先跑過 train_and_save.py。
+先在程式內組出每位客戶一列的明細（build_mart：原始特徵 + 是否流失 + 預測流失機率 + 客群 + 使用月數分組；
+預測流失機率是交叉驗證的 out-of-fold 機率），再從它輸出：
 - churn_dashboard.csv：Tableau dashboard 用的明細，每位客戶一列，欄名中文，另外放好在 Tableau 裡彙總用的輔助欄。
   所有互動的圖都接這一個檔，所以在儀表板上點任何一張圖，整頁會一起篩選（連動）
 - feature_importance.csv：模型的特徵重要度（模型整體的性質，不隨篩選改變）
@@ -11,7 +11,6 @@
 
 用法：
     uv run export_for_tableau.py
-Tableau 操作步驟見 tableau/TABLEAU_GUIDE.md。
 """
 import os
 
@@ -143,7 +142,6 @@ def main():
     dash = build_dashboard(mart)
 
     outputs = {
-        "churn_mart.csv": mart.round({"預測流失機率": 4}),
         "churn_dashboard.csv": dash,
         "feature_importance.csv": feature_importance(art).round(4),
         "data_quality.csv": data_quality(mart).round(4),

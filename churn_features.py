@@ -1,6 +1,6 @@
 """客戶流失專案共用的特徵工程、編碼與評分。
 
-訓練（train_and_save.py）、批次評分（load_to_postgres.py、export_for_tableau.py）
+訓練（train_and_save.py）、批次評分（export_for_tableau.py）
 和即時預測（app.py）都從這裡 import，確保每個地方處理資料的方式完全一樣。
 """
 import json
